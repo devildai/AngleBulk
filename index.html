@@ -1,0 +1,1104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Anglecam Studio</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📷</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.1/cropper.min.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --accent:#FF5500; --accent2:#ff7a33;
+  --dark:#111827; --dark2:#1f2937; --dark3:#374151;
+  --mid:#4b5563; --border:#2d3748;
+  --surface:#1a2236; --surface2:#222e45;
+  --input-bg:#0f172a;
+  --green:#10b981; --blue:#3b82f6; --purple:#8b5cf6;
+  --amber:#f59e0b; --red:#ef4444;
+  --text:#f1f5f9; --text2:#94a3b8;
+}
+body { font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; background:var(--dark); color:var(--text); height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+/* ── TOPBAR ── */
+.topbar { height:52px; background:var(--surface); border-bottom:1px solid var(--border); display:flex; align-items:center; padding:0 16px; gap:12px; flex-shrink:0; z-index:10; }
+.brand { font-size:1.1rem; font-weight:800; color:var(--accent); font-style:italic; margin-right:auto; }
+kbd { background:var(--dark3); border:1px solid var(--mid); border-radius:3px; padding:0 4px; font-size:0.65rem; color:var(--text); }
+.hint { font-size:0.72rem; color:var(--text2); background:var(--dark2); padding:3px 8px; border-radius:4px; }
+.topbar-btn { background:var(--accent); color:#fff; border:none; border-radius:6px; padding:0 14px; height:32px; font-size:0.8rem; font-weight:700; cursor:pointer; display:flex; align-items:center; gap:6px; transition:background .15s; }
+.topbar-btn:hover { background:var(--accent2); }
+.topbar-btn.purple { background:var(--purple); }
+.topbar-btn.purple:hover { background:#7c3aed; }
+.topbar-btn:disabled { opacity:.4; cursor:not-allowed; }
+#hiddenUpload { display:none; }
+.prog-wrap { flex:0 0 160px; height:6px; background:var(--dark3); border-radius:4px; overflow:hidden; display:none; }
+.prog-fill { height:100%; background:var(--green); border-radius:4px; width:0%; transition:width .25s; }
+.prog-label { font-size:0.72rem; color:var(--green); white-space:nowrap; display:none; }
+select.topbar-select { background:var(--surface2); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:4px 8px; font-size:0.78rem; height:32px; cursor:pointer; }
+
+/* ── LAYOUT ── */
+.layout { display:grid; grid-template-columns:110px 1fr 310px; flex:1; overflow:hidden; }
+
+/* ── FILMSTRIP ── */
+.filmstrip { background:var(--surface); border-right:1px solid var(--border); overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; gap:6px; padding:8px; }
+.filmstrip::-webkit-scrollbar { width:4px; } .filmstrip::-webkit-scrollbar-thumb { background:var(--dark3); border-radius:2px; }
+.film-item { position:relative; border-radius:6px; overflow:hidden; cursor:pointer; border:2px solid transparent; flex-shrink:0; aspect-ratio:1; background:var(--dark2); transition:border-color .15s, transform .1s; }
+.film-item:hover { border-color:var(--mid); transform:scale(1.02); }
+.film-item.active { border-color:var(--accent); }
+.film-item.processing { border-color:var(--amber); }
+.film-item.needs-review { border-color:var(--amber); }
+.film-item.confirmed { border-color:var(--green); }
+.film-item img { width:100%; height:100%; object-fit:cover; display:block; }
+.film-state { position:absolute; top:2px; right:2px; font-size:11px; line-height:1; }
+.film-num { position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,.6); font-size:9px; color:#ccc; text-align:center; padding:2px 0; }
+.film-spin { position:absolute; inset:0; background:rgba(0,0,0,.5); display:flex; align-items:center; justify-content:center; font-size:18px; }
+@keyframes spin { to { transform:rotate(360deg); } }
+.spinner { display:inline-block; width:20px; height:20px; border:2px solid rgba(255,255,255,.2); border-top-color:var(--amber); border-radius:50%; animation:spin .7s linear infinite; }
+.filmstrip-empty { color:var(--mid); font-size:0.7rem; text-align:center; padding:20px 4px; line-height:1.6; }
+
+/* ── CANVAS ── */
+.canvas-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; background:#0d1117; background-image:radial-gradient(var(--border) 1px,transparent 1px); background-size:24px 24px; overflow:hidden; position:relative; }
+.drop-zone { border:2px dashed var(--border); border-radius:12px; padding:40px 60px; display:flex; flex-direction:column; align-items:center; gap:14px; cursor:pointer; transition:border-color .2s; color:var(--mid); }
+.drop-zone:hover, .drop-zone.dragover { border-color:var(--accent); }
+.drop-zone p { font-size:0.85rem; }
+.drop-zone small { font-size:0.72rem; }
+#crop-image { display:none; max-width:100%; max-height:100%; }
+#final-canvas { display:none; max-width:100%; max-height:100%; border-radius:4px; box-shadow:0 8px 32px rgba(0,0,0,.5); }
+.status-pill { position:absolute; top:10px; left:50%; transform:translateX(-50%); background:rgba(17,24,39,.85); border:1px solid var(--border); border-radius:20px; padding:5px 14px; font-size:0.75rem; color:var(--text2); backdrop-filter:blur(6px); white-space:nowrap; pointer-events:none; }
+.canvas-nav { position:absolute; bottom:12px; display:flex; gap:8px; align-items:center; }
+.nav-btn { background:rgba(255,255,255,.08); border:1px solid var(--border); color:var(--text); border-radius:6px; padding:6px 14px; font-size:0.78rem; font-weight:600; cursor:pointer; transition:background .15s; backdrop-filter:blur(6px); }
+.nav-btn:hover { background:rgba(255,255,255,.15); }
+.nav-btn:disabled { opacity:.3; cursor:not-allowed; }
+.counter { background:rgba(0,0,0,.4); border:1px solid var(--border); border-radius:6px; padding:6px 12px; font-size:0.78rem; font-weight:600; color:var(--text2); backdrop-filter:blur(6px); }
+
+/* ── RIGHT PANEL ── */
+.right-panel { background:var(--surface); border-left:1px solid var(--border); display:flex; flex-direction:column; overflow:hidden; }
+.panel-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+.panel-tab { flex:1; padding:10px 4px; text-align:center; font-size:0.7rem; font-weight:700; color:var(--text2); cursor:pointer; border-bottom:2px solid transparent; transition:color .15s,border-color .15s; text-transform:uppercase; letter-spacing:.4px; }
+.panel-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+.panel-body { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:10px; }
+.panel-body::-webkit-scrollbar { width:4px; } .panel-body::-webkit-scrollbar-thumb { background:var(--dark3); border-radius:2px; }
+.tab-pane { display:none; flex-direction:column; gap:10px; }
+.tab-pane.active { display:flex; }
+
+.field { display:flex; flex-direction:column; gap:4px; }
+.field label { font-size:0.68rem; font-weight:700; color:var(--text2); text-transform:uppercase; letter-spacing:.5px; display:flex; align-items:center; gap:6px; }
+.required-badge { background:var(--red); color:#fff; font-size:0.6rem; padding:1px 5px; border-radius:3px; font-weight:700; }
+input[type=text],input[type=datetime-local],select { background:var(--input-bg); border:1px solid var(--border); border-radius:6px; color:var(--text); padding:7px 10px; font-size:0.82rem; width:100%; outline:none; transition:border-color .15s; }
+input[type=text]:focus,input[type=datetime-local]:focus,select:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(255,85,0,.15); }
+input.required-field { border-color:var(--red); box-shadow:0 0 0 2px rgba(239,68,68,.15); }
+input.required-field:focus { border-color:var(--red); }
+input.confirmed-field { border-color:var(--green); }
+select { cursor:pointer; } select option { background:var(--dark2); }
+.section-label { font-size:0.66rem; color:var(--mid); text-transform:uppercase; letter-spacing:.6px; font-weight:700; border-bottom:1px solid var(--border); padding-bottom:4px; margin-top:2px; }
+.ratio-pills { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; }
+.ratio-pill { background:var(--input-bg); border:1px solid var(--border); border-radius:5px; color:var(--text2); font-size:0.72rem; font-weight:700; padding:6px 2px; text-align:center; cursor:pointer; transition:all .15s; }
+.ratio-pill:hover,.ratio-pill.active { background:var(--accent); border-color:var(--accent); color:#fff; }
+.btn { border:none; border-radius:6px; font-size:0.82rem; font-weight:700; padding:9px 14px; cursor:pointer; transition:all .15s; display:flex; align-items:center; justify-content:center; gap:6px; width:100%; }
+.btn-primary { background:var(--accent); color:#fff; }
+.btn-primary:hover { background:var(--accent2); }
+.btn-green { background:var(--green); color:#fff; }
+.btn-green:hover { background:#059669; }
+.btn-blue { background:var(--blue); color:#fff; }
+.btn-blue:hover { background:#2563eb; }
+.btn-amber { background:var(--amber); color:#111; }
+.btn-amber:hover { background:#d97706; }
+.btn-red { background:var(--red); color:#fff; }
+.btn-red:hover { background:#dc2626; }
+.btn-ghost { background:transparent; color:var(--text2); border:1px solid var(--border); }
+.btn-ghost:hover { background:var(--dark2); color:var(--text); }
+.btn:disabled { opacity:.35; cursor:not-allowed; }
+.check-row { display:flex; align-items:center; gap:8px; }
+.check-row input[type=checkbox] { width:14px; height:14px; accent-color:var(--accent); cursor:pointer; }
+.check-row label { font-size:0.75rem; color:var(--text2); cursor:pointer; }
+.stamp-row { display:flex; gap:6px; }
+.stamp-row .btn-primary { flex:1; }
+.stamp-row .btn-ghost { width:auto; padding:9px 10px; flex-shrink:0; }
+
+/* ── PROCESSING OVERLAY ── */
+.process-overlay { position:fixed; inset:0; background:rgba(0,0,0,.8); backdrop-filter:blur(6px); z-index:200; display:none; flex-direction:column; align-items:center; justify-content:center; gap:20px; }
+.process-overlay.open { display:flex; }
+.process-card { background:var(--surface2); border:1px solid var(--border); border-radius:14px; padding:32px 48px; display:flex; flex-direction:column; align-items:center; gap:16px; min-width:360px; box-shadow:0 24px 64px rgba(0,0,0,.6); }
+.process-title { font-size:1rem; font-weight:700; color:var(--text); }
+.process-sub { font-size:0.8rem; color:var(--text2); }
+.process-bar-wrap { width:100%; height:8px; background:var(--dark3); border-radius:6px; overflow:hidden; }
+.process-bar-fill { height:100%; background:var(--green); border-radius:6px; width:0%; transition:width .3s; }
+.process-step { font-size:0.75rem; color:var(--amber); }
+.process-img-preview { width:120px; height:90px; object-fit:cover; border-radius:8px; border:2px solid var(--border); }
+
+/* ── REVIEW BANNER ── */
+.review-banner { background:linear-gradient(135deg,#1e3a1e,#0f2d0f); border-bottom:2px solid var(--green); padding:8px 16px; display:none; align-items:center; gap:12px; flex-shrink:0; }
+.review-banner.open { display:flex; }
+.review-banner-text { color:var(--green); font-size:0.82rem; font-weight:700; }
+.review-banner-sub { color:var(--text2); font-size:0.72rem; margin-left:auto; }
+
+/* ── MAP MODAL ── */
+.modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); backdrop-filter:blur(4px); z-index:300; align-items:center; justify-content:center; }
+.modal-bg.open { display:flex; }
+.modal-card { background:var(--surface2); border:1px solid var(--border); border-radius:12px; width:92%; max-width:520px; padding:16px; display:flex; flex-direction:column; gap:12px; box-shadow:0 24px 64px rgba(0,0,0,.6); }
+.modal-card h3 { font-size:0.95rem; font-weight:700; }
+#map { height:300px; border-radius:8px; z-index:1; }
+.modal-foot { display:flex; justify-content:flex-end; gap:8px; }
+
+/* ── TOAST ── */
+.toast { position:fixed; bottom:24px; right:24px; background:var(--green); color:#fff; border-radius:8px; padding:10px 18px; font-size:0.82rem; font-weight:600; box-shadow:0 8px 24px rgba(0,0,0,.4); transform:translateY(80px); opacity:0; transition:all .3s; z-index:400; }
+.toast.show { transform:translateY(0); opacity:1; }
+.toast.error { background:var(--red); }
+.toast.warn { background:var(--amber); color:#111; }
+
+/* ── CONFIRM BUTTON PULSE ── */
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.4)} 50%{box-shadow:0 0 0 8px rgba(16,185,129,0)} }
+.btn-confirm-pulse { animation:pulse 1.5s infinite; }
+
+/* ── Scanned field flash ── */
+@keyframes flash { 0%,100%{border-color:var(--border)} 50%{border-color:var(--green)} }
+.scanned { animation:flash .6s ease 2; }
+</style>
+</head>
+<body>
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <span class="brand">📷 Anglecam Studio</span>
+  <span class="hint"><kbd>Enter</kbd> Confirm &amp; Next &nbsp;|&nbsp; <kbd>←</kbd><kbd>→</kbd> Navigate</span>
+  <div class="prog-wrap" id="progWrap"><div class="prog-fill" id="progFill"></div></div>
+  <span class="prog-label" id="progLabel"></span>
+  <button class="topbar-btn" onclick="document.getElementById('hiddenUpload').click()">
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16V4m0 0L8 8m4-4 4 4M4 20h16"/></svg>
+    Upload Photos
+  </button>
+  <input type="file" id="hiddenUpload" accept="image/*" multiple>
+  <select id="exportRes" class="topbar-select">
+    <option value="original">Original Size</option>
+    <option value="1920">HD 1920px</option>
+    <option value="1280">720p 1280px</option>
+  </select>
+  <button class="topbar-btn purple" id="btnZip" disabled>
+    📦 Download ZIP
+  </button>
+</div>
+
+<!-- REVIEW BANNER -->
+<div class="review-banner" id="reviewBanner">
+  <span style="font-size:1.2rem">👁</span>
+  <span class="review-banner-text">Review Mode — Check each photo before finalizing</span>
+  <span class="review-banner-sub" id="reviewProgress">0 / 0 confirmed</span>
+</div>
+
+<!-- MAIN -->
+<div class="layout">
+
+  <!-- FILMSTRIP -->
+  <div class="filmstrip" id="filmstrip">
+    <div class="filmstrip-empty" id="filmEmpty">Upload photos<br>to begin</div>
+  </div>
+
+  <!-- CANVAS -->
+  <div class="canvas-wrap" id="canvasWrap">
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('hiddenUpload').click()">
+      <svg width="52" height="52" fill="none" stroke="currentColor" stroke-width="1.2" viewBox="0 0 24 24" opacity="0.4">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 15.75l5.16-5.16a2.25 2.25 0 013.18 0l5.16 5.16m-1.5-1.5 1.41-1.41a2.25 2.25 0 013.18 0l2.91 2.91M16.5 8.25h.008v.008H16.5V8.25z"/>
+      </svg>
+      <p>Click or drag photos here</p>
+      <small>Multiple photos supported — auto-processes instantly</small>
+    </div>
+    <img id="crop-image" src="" alt="">
+    <canvas id="final-canvas"></canvas>
+    <div class="status-pill" id="statusPill">Waiting…</div>
+    <div class="canvas-nav" id="canvasNav" style="display:none">
+      <button class="nav-btn" id="btnPrev">← Prev</button>
+      <span class="counter" id="counter">1 / 1</span>
+      <button class="nav-btn" id="btnNext">Next →</button>
+    </div>
+  </div>
+
+  <!-- RIGHT PANEL -->
+  <div class="right-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" data-tab="review">✅ Review</div>
+      <div class="panel-tab" data-tab="crop">✂ Crop</div>
+      <div class="panel-tab" data-tab="gps">📍 GPS</div>
+      <div class="panel-tab" data-tab="export">💾 Export</div>
+    </div>
+    <div class="panel-body">
+
+      <!-- REVIEW TAB -->
+      <div class="tab-pane active" id="tab-review">
+        <div class="section-label">⚠ Required to Confirm</div>
+
+        <div class="field">
+          <label>Date &amp; Time <span class="required-badge">REQUIRED</span></label>
+          <input type="datetime-local" id="r-time" class="required-field">
+          <small style="font-size:0.68rem;color:var(--red)" id="timeWarning">⚠ You must set the time before confirming</small>
+        </div>
+
+        <div class="field">
+          <label>Note</label>
+          <input type="text" id="r-note" placeholder="e.g. sudip poudel">
+        </div>
+
+        <div class="section-label">GPS (auto-filled — edit if wrong)</div>
+        <div style="display:flex;gap:6px;">
+          <div class="field" style="flex:1"><label>Lat</label><input type="text" id="r-lat"></div>
+          <div class="field" style="flex:1"><label>Lon</label><input type="text" id="r-lon"></div>
+        </div>
+        <button class="btn btn-blue" id="btnMapReview" style="margin-top:-4px">🗺 Pick on Map</button>
+        <div class="field"><label>Accuracy</label><input type="text" id="r-acc"></div>
+        <div class="field"><label>Azimuth</label><input type="text" id="r-azi"></div>
+        <div class="field"><label>Pitch</label><input type="text" id="r-pitch"></div>
+
+        <div class="section-label">Actions</div>
+        <button class="btn btn-primary" id="btnRestamp">🔄 Re-stamp with edits</button>
+        <button class="btn btn-green btn-confirm-pulse" id="btnConfirm" disabled>✓ Confirm &amp; Next →</button>
+        <p style="font-size:0.68rem;color:var(--mid);text-align:center">Set time above, then confirm. Press <kbd>Enter</kbd> to advance.</p>
+      </div>
+
+      <!-- CROP TAB -->
+      <div class="tab-pane" id="tab-crop">
+        <div class="section-label">Aspect Ratio</div>
+        <div class="ratio-pills">
+          <div class="ratio-pill" data-ratio="0.5625">9:16</div>
+          <div class="ratio-pill" data-ratio="1.7778">16:9</div>
+          <div class="ratio-pill" data-ratio="0.75">3:4</div>
+          <div class="ratio-pill" data-ratio="1.3333">4:3</div>
+        </div>
+
+        <div class="section-label" style="margin-top:4px">Manual Crop Override</div>
+        <p style="font-size:0.72rem;color:var(--text2)">Use this if the auto-crop removed too much or too little. Drag the crop box, then re-stamp.</p>
+        <button class="btn btn-amber" id="btnEnterCrop">✂ Enter Crop Mode</button>
+        <div class="check-row">
+          <input type="checkbox" id="autoCropTag" checked>
+          <label for="autoCropTag">Auto-remove old tag area after OCR</label>
+        </div>
+        <div class="check-row">
+          <input type="checkbox" id="upscaleCrop" checked>
+          <label for="upscaleCrop">Upscale low-res crops</label>
+        </div>
+        <div class="section-label" style="margin-top:4px">Stamp</div>
+        <div class="stamp-row">
+          <button class="btn btn-primary" id="btnStamp" disabled>✓ Stamp</button>
+          <button class="btn btn-ghost" id="btnRevert" title="Discard crop, back to result">↺</button>
+        </div>
+      </div>
+
+      <!-- GPS TAB -->
+      <div class="tab-pane" id="tab-gps">
+        <div class="field">
+          <label>Latitude</label><input type="text" id="lat" placeholder="28.206849">
+        </div>
+        <div class="field">
+          <label>Longitude</label><input type="text" id="lon" placeholder="83.994412">
+        </div>
+        <button class="btn btn-blue" id="btnOpenMap">🗺 Pick on Map</button>
+        <div class="field"><label>Accuracy</label><input type="text" id="acc"></div>
+        <div class="field"><label>Azimuth</label><input type="text" id="azi"></div>
+        <div class="field"><label>Pitch</label><input type="text" id="pitch"></div>
+        <div class="field"><label>Date &amp; Time</label><input type="datetime-local" id="timeInput"></div>
+        <div class="field"><label>Note</label><input type="text" id="note"></div>
+        <button class="btn btn-ghost" id="btnRandomize" style="margin-top:4px">🎲 Randomize Acc / Azi / Pitch</button>
+        <button class="btn btn-ghost" id="btnApplyGpsToAll" style="margin-top:4px">📋 Apply GPS to ALL photos</button>
+      </div>
+
+      <!-- EXPORT TAB -->
+      <div class="tab-pane" id="tab-export">
+        <div class="section-label">Current Photo Filename</div>
+        <div class="field">
+          <label>Filename (this photo)</label>
+          <input type="text" id="customFileName" placeholder="IMG_20260908.jpg">
+        </div>
+        <p style="font-size:0.7rem;color:var(--mid)">Original name is pre-filled. Edit to rename.</p>
+
+        <div class="section-label" style="margin-top:4px">Bulk ZIP Prefix</div>
+        <div class="field">
+          <label>ZIP bundle name prefix</label>
+          <input type="text" id="zipPrefix" placeholder="anglecam_site">
+        </div>
+
+        <div class="section-label" style="margin-top:4px">Download</div>
+        <button class="btn btn-green" id="btnDownloadSingle" disabled>⬇ Download This Photo</button>
+        <button class="btn btn-primary" id="btnDownloadAll" disabled>📦 Download All ZIP</button>
+        <div id="zipProg" style="display:none">
+          <div style="height:6px;background:var(--dark3);border-radius:3px;overflow:hidden;margin-top:6px">
+            <div id="zipProgFill" style="height:100%;background:var(--green);width:0%;transition:width .2s;border-radius:3px"></div>
+          </div>
+          <p id="zipProgLabel" style="font-size:0.72rem;color:var(--green);margin-top:4px"></p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- PROCESSING OVERLAY -->
+<div class="process-overlay" id="processOverlay">
+  <div class="process-card">
+    <img id="procPreview" class="process-img-preview" src="" alt="">
+    <div class="process-title" id="procTitle">Processing photos…</div>
+    <div class="process-step" id="procStep">Starting…</div>
+    <div class="process-bar-wrap"><div class="process-bar-fill" id="procBar"></div></div>
+    <div class="process-sub" id="procSub">0 / 0</div>
+  </div>
+</div>
+
+<!-- MAP MODAL -->
+<div class="modal-bg" id="mapModal">
+  <div class="modal-card">
+    <h3>📍 Pick Location on Map</h3>
+    <div id="map"></div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" id="btnCancelMap" style="width:auto;padding:8px 16px">Cancel</button>
+      <button class="btn btn-primary" id="btnConfirmMap" style="width:auto;padding:8px 20px">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════
+let queue = [];
+/*  Each item:
+    { file, objectURL, originalName,
+      extractedData: {lat,lon,acc,azi,pitch,time,note},
+      croppedCanvas,       // canvas after auto-crop
+      resultDataURL,       // stamped jpeg data URL
+      status: 'pending'|'processing'|'processed'|'confirmed',
+      timeConfirmed: bool
+    }
+*/
+let currentIdx = -1;
+let cropper = null;
+let map = null, marker = null;
+let activeMapTarget = 'gps'; // 'gps' or 'review'
+
+const cropImage   = document.getElementById('crop-image');
+const finalCanvas = document.getElementById('final-canvas');
+const ctx         = finalCanvas.getContext('2d');
+const statusPill  = document.getElementById('statusPill');
+const filmstrip   = document.getElementById('filmstrip');
+const canvasNav   = document.getElementById('canvasNav');
+const counter     = document.getElementById('counter');
+
+// ═══════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  randomizeDefaults();
+  setLocalTime();
+});
+
+function setLocalTime() {
+  const tzOff = new Date().getTimezoneOffset() * 60000;
+  const iso = new Date(Date.now() - tzOff).toISOString().slice(0,16);
+  document.getElementById('timeInput').value = iso;
+}
+
+function randomizeDefaults() {
+  document.getElementById('lat').value = '28.206849';
+  document.getElementById('lon').value = '83.994412';
+  const acc = (Math.random()*(6.47-3.39)+3.39).toFixed(2);
+  document.getElementById('acc').value = `${acc} m`;
+  const azi = Math.floor(Math.random()*360);
+  const dirs = ['N','NE','E','SE','S','SW','W','NW'];
+  document.getElementById('azi').value = `${azi}° (${dirs[Math.round(azi/45)%8]})`;
+  const p1 = (Math.random()*180-90).toFixed(1);
+  const p2 = (Math.random()*180-90).toFixed(1);
+  document.getElementById('pitch').value = `${p1}° (${p2}°)`;
+}
+
+// ═══════════════════════════════════════════════
+// TABS
+// ═══════════════════════════════════════════════
+document.querySelectorAll('.panel-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.panel-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+// ═══════════════════════════════════════════════
+// FILE UPLOAD
+// ═══════════════════════════════════════════════
+document.getElementById('hiddenUpload').addEventListener('change', e => {
+  if (e.target.files?.length > 0) startPipeline(e.target.files);
+});
+
+// Drag & drop
+const canvasWrap = document.getElementById('canvasWrap');
+const dropZone   = document.getElementById('dropZone');
+canvasWrap.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+canvasWrap.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+canvasWrap.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length > 0) startPipeline(e.dataTransfer.files);
+});
+
+// ═══════════════════════════════════════════════
+// AUTO-PROCESS PIPELINE
+// ═══════════════════════════════════════════════
+async function startPipeline(files) {
+  queue = Array.from(files).map(f => ({
+    file: f,
+    objectURL: URL.createObjectURL(f),
+    originalName: f.name.replace(/\.[^.]+$/, '') + '.jpg',
+    extractedData: {},
+    croppedCanvas: null,
+    resultDataURL: null,
+    status: 'pending',
+    timeConfirmed: false
+  }));
+
+  document.getElementById('filmEmpty').style.display = 'none';
+  currentIdx = 0;
+  renderFilmstrip();
+  showProcessOverlay(true);
+
+  // Process sequentially
+  for (let i = 0; i < queue.length; i++) {
+    queue[i].status = 'processing';
+    renderFilmstrip();
+    await processPhoto(i);
+    queue[i].status = 'processed';
+    renderFilmstrip();
+    updateTopProgress();
+  }
+
+  showProcessOverlay(false);
+  document.getElementById('reviewBanner').classList.add('open');
+  showToast(`✅ ${queue.length} photos processed — review & confirm each`, 'warn');
+  openReview(0);
+}
+
+async function processPhoto(i) {
+  const item = queue[i];
+  const total = queue.length;
+
+  // Update overlay
+  document.getElementById('procPreview').src = item.objectURL;
+  document.getElementById('procTitle').textContent = `Processing ${i+1} of ${total}`;
+  document.getElementById('procSub').textContent = item.file.name;
+  document.getElementById('procBar').style.width = ((i / total) * 100) + '%';
+
+  // Load image
+  const img = await loadImage(item.objectURL);
+
+  // Step 1: OCR
+  document.getElementById('procStep').textContent = '🔍 Scanning for existing tag…';
+  const extracted = await ocrPhoto(img);
+  item.extractedData = extracted;
+
+  // Step 2: Auto-crop
+  document.getElementById('procStep').textContent = '✂ Auto-cropping…';
+  const hasTag = extracted.lat || extracted.lon || extracted.note;
+  item.croppedCanvas = autoCrop(img, hasTag);
+
+  // Step 3: Stamp
+  document.getElementById('procStep').textContent = '🖊 Stamping watermark…';
+  item.resultDataURL = stampCanvas(item.croppedCanvas, buildLines(extracted));
+
+  document.getElementById('procBar').style.width = (((i+1) / total) * 100) + '%';
+}
+
+function loadImage(src) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.src = src;
+  });
+}
+
+async function ocrPhoto(img) {
+  try {
+    const tc = document.createElement('canvas');
+    const sh = img.naturalHeight * 0.4;
+    const sw = img.naturalWidth  * 0.6;
+    tc.width = sw; tc.height = sh;
+    tc.getContext('2d').drawImage(img, 0, img.naturalHeight - sh, sw, sh, 0, 0, sw, sh);
+
+    const result = await Tesseract.recognize(tc, 'eng');
+    return parseOCR(result.data.text);
+  } catch { return {}; }
+}
+
+function parseOCR(txt) {
+  const g = (re) => { const m = txt.match(re); return m ? m[1].trim() : ''; };
+  const lat  = g(/Latitude:\s*([\d.]+)/i);
+  const lon  = g(/Longitude:\s*([\d.]+)/i);
+  const acc  = g(/Accuracy:\s*([\d.]+\s*m)/i);
+  const azi  = g(/Azimuth:\s*([-\d]+[^)\n]*\))/i);
+  const pitch= g(/Pitch:\s*([-\d]+[^)\n]*\))/i);
+  let   note = g(/Note:\s*([^\n]+)/i);
+  if (note) note = note.replace(/[>~©]+.*$/, '').trim();
+  let   time = '';
+  const tm = txt.match(/Time:\s*([\d.]+)\s+([\d:]+)/i);
+  if (tm) {
+    const dp = tm[1].split('.');
+    if (dp.length === 3) time = `${dp[2]}-${dp[1]}-${dp[0]}T${tm[2]}`;
+  }
+  return { lat, lon, acc, azi, pitch, note, time };
+}
+
+function autoCrop(img, hasTag) {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth;
+
+  // Always crop bottom if checkbox is checked (for re-tagging workflow)
+  // hasTag from OCR is a hint, but don't rely on it alone
+  const shouldCrop = document.getElementById('autoCropTag').checked;
+  const keepRatio  = shouldCrop ? 0.85 : 1.0;
+  c.height = Math.floor(img.naturalHeight * keepRatio);
+
+  // KEY FIX: source height = c.height (top portion only), NOT img.naturalHeight
+  // Using 9-arg drawImage: drawImage(src, sx, sy, sw, sh, dx, dy, dw, dh)
+  c.getContext('2d').drawImage(
+    img,
+    0, 0, c.width, c.height,   // source: top-left crop, only c.height rows
+    0, 0, c.width, c.height    // destination: full canvas
+  );
+
+  // Upscale if needed
+  if (document.getElementById('upscaleCrop').checked) {
+    const minSide = Math.min(c.width, c.height);
+    if (minSide < 1280) {
+      const sf = 1280 / minSide;
+      const uc = document.createElement('canvas');
+      uc.width  = Math.round(c.width  * sf);
+      uc.height = Math.round(c.height * sf);
+      const ux = uc.getContext('2d');
+      ux.imageSmoothingEnabled = true; ux.imageSmoothingQuality = 'high';
+      ux.drawImage(c, 0, 0, uc.width, uc.height);
+      return uc;
+    }
+  }
+  return c;
+}
+
+function buildLines(d) {
+  const lines = [];
+  if (d.lat)   lines.push(`Latitude: ${parseFloat(d.lat).toFixed(6)}`);
+  if (d.lon)   lines.push(`Longitude: ${parseFloat(d.lon).toFixed(6)}`);
+  if (d.acc)   lines.push(`Accuracy: ${d.acc}`);
+  if (d.azi)   lines.push(`Azimuth: ${d.azi}`);
+  if (d.pitch) lines.push(`Pitch: ${d.pitch}`);
+  if (d.time) {
+    const dt = new Date(d.time);
+    if (!isNaN(dt)) {
+      const p = n => String(n).padStart(2,'0');
+      lines.push(`Time: ${p(dt.getDate())}.${p(dt.getMonth()+1)}.${dt.getFullYear()} ${p(dt.getHours())}:${p(dt.getMinutes())}`);
+    }
+  }
+  if (d.note)  lines.push(`Note: ${d.note}`);
+  return lines;
+}
+
+function stampCanvas(src, lines) {
+  const c = document.createElement('canvas');
+  c.width  = src.width; c.height = src.height;
+  const cx = c.getContext('2d');
+  cx.drawImage(src, 0, 0);
+
+  if (lines.length > 0) {
+    const fs = Math.max(10, c.height * 0.022);
+    cx.font = `${fs}px Arial,sans-serif`;
+    cx.textAlign = 'left'; cx.textBaseline = 'top';
+    const pad = fs * 0.08, lh = fs * 1.05;
+    const boxH = lines.length * lh + pad * 2;
+    let maxW = 0;
+    lines.forEach(l => maxW = Math.max(maxW, cx.measureText(l).width));
+    const boxW = maxW + pad * 2;
+    const boxY = c.height - boxH;
+    cx.fillStyle = '#ffffff';
+    cx.fillRect(0, boxY, boxW, boxH);
+    cx.fillStyle = '#111111';
+    lines.forEach((l,i) => cx.fillText(l, pad, boxY + pad + i * lh));
+  }
+
+  // Branding
+  const bfs = Math.max(14, c.height * 0.030);
+  cx.font = `italic bold ${bfs}px Arial,sans-serif`;
+  cx.textAlign = 'right'; cx.textBaseline = 'bottom';
+  const bpad = bfs * 0.55;
+  cx.strokeStyle = '#1a237e';
+  cx.lineWidth = Math.max(1, bfs * 0.04);
+  cx.lineJoin = 'round';
+  cx.strokeText('Powered by AngleCam', c.width - bpad, c.height - bpad);
+  cx.fillStyle = '#ee4d12';
+  cx.fillText('Powered by AngleCam', c.width - bpad, c.height - bpad);
+
+  return c.toDataURL('image/jpeg', 0.95);
+}
+
+// ═══════════════════════════════════════════════
+// PROCESSING OVERLAY
+// ═══════════════════════════════════════════════
+function showProcessOverlay(show) {
+  document.getElementById('processOverlay').classList.toggle('open', show);
+}
+
+// ═══════════════════════════════════════════════
+// REVIEW MODE — open one photo
+// ═══════════════════════════════════════════════
+function openReview(index) {
+  if (index < 0 || index >= queue.length) return;
+  currentIdx = index;
+  const item = queue[index];
+
+  // Show result canvas
+  dropZone.style.display = 'none';
+  cropImage.style.display = 'none';
+  if (cropper) { cropper.destroy(); cropper = null; }
+
+  finalCanvas.width  = 1;
+  finalCanvas.height = 1;
+  // Draw stamped result
+  const img = new Image();
+  img.onload = () => {
+    finalCanvas.width  = img.width;
+    finalCanvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+    finalCanvas.style.display = 'block';
+  };
+  img.src = item.resultDataURL;
+
+  // Populate review fields
+  const d = item.extractedData;
+  document.getElementById('r-lat').value   = d.lat   || document.getElementById('lat').value;
+  document.getElementById('r-lon').value   = d.lon   || document.getElementById('lon').value;
+  document.getElementById('r-acc').value   = d.acc   || document.getElementById('acc').value;
+  document.getElementById('r-azi').value   = d.azi   || document.getElementById('azi').value;
+  document.getElementById('r-pitch').value = d.pitch || document.getElementById('pitch').value;
+  document.getElementById('r-note').value  = d.note  || '';
+  // Time: if OCR found time, pre-fill but keep it flagged
+  const rTime = document.getElementById('r-time');
+  if (d.time) {
+    rTime.value = d.time;
+  } else {
+    // Default to now but leave as required
+    setLocalTime();
+    rTime.value = document.getElementById('timeInput').value;
+  }
+
+  // Filename
+  document.getElementById('customFileName').value = item.originalName;
+
+  updateTimeFieldState();
+  updateConfirmButton();
+  renderFilmstrip();
+  updateTopProgress();
+  updateNavButtons();
+
+  // Switch to Review tab
+  document.querySelector('[data-tab="review"]').click();
+
+  setStatus(`Photo ${index+1}/${queue.length} — ${item.status === 'confirmed' ? '✓ Confirmed' : 'Review required'}`);
+
+  // Single download availability
+  document.getElementById('btnDownloadSingle').disabled = !item.resultDataURL;
+}
+
+function updateTimeFieldState() {
+  const rTime = document.getElementById('r-time');
+  const warn  = document.getElementById('timeWarning');
+  const hasTime = rTime.value.trim() !== '';
+  rTime.classList.toggle('required-field', !hasTime);
+  rTime.classList.toggle('confirmed-field', hasTime);
+  warn.style.display = hasTime ? 'none' : 'block';
+}
+
+document.getElementById('r-time').addEventListener('input', () => {
+  updateTimeFieldState();
+  updateConfirmButton();
+});
+
+function updateConfirmButton() {
+  const hasTime = document.getElementById('r-time').value.trim() !== '';
+  document.getElementById('btnConfirm').disabled = !hasTime;
+}
+
+// ═══════════════════════════════════════════════
+// RE-STAMP (apply edits during review)
+// ═══════════════════════════════════════════════
+document.getElementById('btnRestamp').addEventListener('click', () => {
+  const item = queue[currentIdx];
+  if (!item) return;
+
+  // Collect current review form values
+  const d = {
+    lat  : document.getElementById('r-lat').value,
+    lon  : document.getElementById('r-lon').value,
+    acc  : document.getElementById('r-acc').value,
+    azi  : document.getElementById('r-azi').value,
+    pitch: document.getElementById('r-pitch').value,
+    time : document.getElementById('r-time').value,
+    note : document.getElementById('r-note').value,
+  };
+  item.extractedData = d;
+  item.resultDataURL = stampCanvas(item.croppedCanvas, buildLines(d));
+
+  // Refresh canvas
+  const img = new Image();
+  img.onload = () => {
+    finalCanvas.width = img.width; finalCanvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+  };
+  img.src = item.resultDataURL;
+
+  showToast('✅ Re-stamped');
+  updateConfirmButton();
+});
+
+// ═══════════════════════════════════════════════
+// CONFIRM & NEXT
+// ═══════════════════════════════════════════════
+function confirmAndNext() {
+  const item = queue[currentIdx];
+  if (!item) return;
+  if (!document.getElementById('r-time').value.trim()) {
+    showToast('⚠ Set the time first!', 'warn'); return;
+  }
+
+  // Save edits to extractedData and re-stamp one final time
+  const d = {
+    lat  : document.getElementById('r-lat').value,
+    lon  : document.getElementById('r-lon').value,
+    acc  : document.getElementById('r-acc').value,
+    azi  : document.getElementById('r-azi').value,
+    pitch: document.getElementById('r-pitch').value,
+    time : document.getElementById('r-time').value,
+    note : document.getElementById('r-note').value,
+  };
+  item.extractedData = d;
+  item.resultDataURL = stampCanvas(item.croppedCanvas, buildLines(d));
+  item.status = 'confirmed';
+  item.timeConfirmed = true;
+
+  // Save filename
+  item.originalName = document.getElementById('customFileName').value.trim() || item.originalName;
+
+  renderFilmstrip();
+  updateTopProgress();
+
+  showToast(`✓ Photo ${currentIdx+1} confirmed`);
+
+  // Find next unconfirmed
+  const nextUnconfirmed = queue.findIndex((q, i) => i > currentIdx && q.status !== 'confirmed');
+  if (nextUnconfirmed !== -1) {
+    setTimeout(() => openReview(nextUnconfirmed), 200);
+  } else {
+    // All confirmed
+    const allDone = queue.every(q => q.status === 'confirmed');
+    if (allDone) {
+      showToast('🎉 All photos confirmed! Ready to download.', 'success');
+      document.getElementById('btnZip').disabled = false;
+      document.getElementById('btnDownloadAll').disabled = false;
+    } else if (currentIdx < queue.length - 1) {
+      setTimeout(() => openReview(currentIdx + 1), 200);
+    }
+  }
+}
+
+document.getElementById('btnConfirm').addEventListener('click', confirmAndNext);
+
+// ═══════════════════════════════════════════════
+// KEYBOARD
+// ═══════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (e.key === 'Enter') confirmAndNext();
+  if (e.key === 'ArrowLeft')  openReview(currentIdx - 1);
+  if (e.key === 'ArrowRight') openReview(currentIdx + 1);
+});
+
+// ═══════════════════════════════════════════════
+// FILMSTRIP
+// ═══════════════════════════════════════════════
+function renderFilmstrip() {
+  filmstrip.querySelectorAll('.film-item').forEach(el => el.remove());
+  queue.forEach((item, i) => {
+    const el = document.createElement('div');
+    let cls = 'film-item';
+    if (i === currentIdx)           cls += ' active';
+    if (item.status === 'confirmed') cls += ' confirmed';
+    else if (item.status === 'processed') cls += ' needs-review';
+    else if (item.status === 'processing') cls += ' processing';
+    el.className = cls;
+
+    let stateIcon = '';
+    if (item.status === 'confirmed')  stateIcon = '✅';
+    else if (item.status === 'processed') stateIcon = '⚠️';
+
+    el.innerHTML = `<img src="${item.objectURL}" loading="lazy">
+      <div class="film-num">${i+1}</div>
+      ${item.status === 'processing' ? '<div class="film-spin"><div class="spinner"></div></div>' : ''}
+      ${stateIcon ? `<div class="film-state">${stateIcon}</div>` : ''}`;
+    el.addEventListener('click', () => openReview(i));
+    filmstrip.appendChild(el);
+  });
+}
+
+// ═══════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════
+function updateNavButtons() {
+  canvasNav.style.display = queue.length > 0 ? 'flex' : 'none';
+  counter.textContent = `${currentIdx+1} / ${queue.length}`;
+  document.getElementById('btnPrev').disabled = currentIdx <= 0;
+  document.getElementById('btnNext').disabled = currentIdx >= queue.length - 1;
+}
+
+document.getElementById('btnPrev').addEventListener('click', () => openReview(currentIdx - 1));
+document.getElementById('btnNext').addEventListener('click', () => openReview(currentIdx + 1));
+
+// ═══════════════════════════════════════════════
+// TOP PROGRESS
+// ═══════════════════════════════════════════════
+function updateTopProgress() {
+  const total = queue.length, confirmed = queue.filter(q => q.status === 'confirmed').length;
+  document.getElementById('progWrap').style.display  = total > 0 ? 'block' : 'none';
+  document.getElementById('progLabel').style.display = total > 0 ? 'block' : 'none';
+  document.getElementById('progFill').style.width = total ? (confirmed/total*100)+'%' : '0%';
+  document.getElementById('progLabel').textContent = `${confirmed}/${total} confirmed`;
+  document.getElementById('reviewProgress').textContent = `${confirmed} / ${total} confirmed`;
+  const allConfirmed = total > 0 && confirmed === total;
+  document.getElementById('btnZip').disabled = !allConfirmed;
+  document.getElementById('btnDownloadAll').disabled = !allConfirmed;
+}
+
+// ═══════════════════════════════════════════════
+// MANUAL CROP OVERRIDE
+// ═══════════════════════════════════════════════
+document.getElementById('btnEnterCrop').addEventListener('click', () => {
+  const item = queue[currentIdx];
+  if (!item) return;
+
+  finalCanvas.style.display = 'none';
+  cropImage.style.display = 'block';
+  cropImage.src = item.objectURL;
+
+  cropImage.onload = () => {
+    if (cropper) { cropper.destroy(); cropper = null; }
+    const ratio = cropImage.naturalWidth / cropImage.naturalHeight;
+    let ar = 9/16;
+    if (ratio >= 1.5) ar = 16/9;
+    else if (ratio >= 1.0) ar = 4/3;
+    else if (ratio >= 0.65) ar = 3/4;
+    document.querySelectorAll('.ratio-pill').forEach(p =>
+      p.classList.toggle('active', Math.abs(parseFloat(p.dataset.ratio) - ar) < 0.01));
+    cropper = new Cropper(cropImage, { aspectRatio:ar, viewMode:2, autoCropArea:0.95, background:false });
+    document.getElementById('btnStamp').disabled = false;
+    document.querySelector('[data-tab="crop"]').click();
+    setStatus('Crop mode — adjust box then Stamp');
+  };
+});
+
+document.querySelectorAll('.ratio-pill').forEach(pill => {
+  pill.addEventListener('click', () => {
+    if (!cropper) return;
+    cropper.setAspectRatio(parseFloat(pill.dataset.ratio));
+    document.querySelectorAll('.ratio-pill').forEach(p => p.classList.remove('active'));
+    pill.classList.add('active');
+  });
+});
+
+document.getElementById('btnStamp').addEventListener('click', () => {
+  if (!cropper) return;
+  const item = queue[currentIdx];
+
+  let cropped = cropper.getCroppedCanvas({ imageSmoothingEnabled:true, imageSmoothingQuality:'high' });
+  if (document.getElementById('upscaleCrop').checked) {
+    const minSide = Math.min(cropped.width, cropped.height);
+    if (minSide < 1280) {
+      const sf = 1280/minSide, uc = document.createElement('canvas');
+      uc.width = Math.round(cropped.width*sf); uc.height = Math.round(cropped.height*sf);
+      const ux = uc.getContext('2d');
+      ux.imageSmoothingEnabled=true; ux.imageSmoothingQuality='high';
+      ux.drawImage(cropped,0,0,uc.width,uc.height); cropped = uc;
+    }
+  }
+  item.croppedCanvas = cropped;
+
+  // Re-stamp with current review form data
+  const d = {
+    lat: document.getElementById('r-lat').value, lon: document.getElementById('r-lon').value,
+    acc: document.getElementById('r-acc').value, azi: document.getElementById('r-azi').value,
+    pitch: document.getElementById('r-pitch').value, time: document.getElementById('r-time').value,
+    note: document.getElementById('r-note').value,
+  };
+  item.extractedData = d;
+  item.resultDataURL = stampCanvas(item.croppedCanvas, buildLines(d));
+
+  cropper.destroy(); cropper = null;
+  cropImage.style.display = 'none';
+  document.getElementById('btnStamp').disabled = true;
+
+  const img = new Image();
+  img.onload = () => {
+    finalCanvas.width=img.width; finalCanvas.height=img.height;
+    ctx.drawImage(img,0,0); finalCanvas.style.display='block';
+  };
+  img.src = item.resultDataURL;
+
+  document.querySelector('[data-tab="review"]').click();
+  showToast('✅ Re-cropped and stamped');
+});
+
+document.getElementById('btnRevert').addEventListener('click', () => {
+  if (cropper) { cropper.destroy(); cropper = null; }
+  cropImage.style.display = 'none';
+  document.getElementById('btnStamp').disabled = true;
+  openReview(currentIdx);
+});
+
+// ═══════════════════════════════════════════════
+// MAP
+// ═══════════════════════════════════════════════
+function openMap(target) {
+  activeMapTarget = target;
+  const latEl = target === 'review' ? 'r-lat' : 'lat';
+  const lonEl = target === 'review' ? 'r-lon' : 'lon';
+  const lat = parseFloat(document.getElementById(latEl).value) || 28.206849;
+  const lon = parseFloat(document.getElementById(lonEl).value) || 83.994412;
+  document.getElementById('mapModal').classList.add('open');
+  if (!map) {
+    map = L.map('map').setView([lat,lon],14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(map);
+    marker = L.marker([lat,lon],{draggable:true}).addTo(map);
+    map.on('click', e => marker.setLatLng(e.latlng));
+  } else { marker.setLatLng([lat,lon]); map.setView([lat,lon]); }
+  setTimeout(() => map.invalidateSize(), 120);
+}
+
+document.getElementById('btnOpenMap').addEventListener('click',   () => openMap('gps'));
+document.getElementById('btnMapReview').addEventListener('click', () => openMap('review'));
+document.getElementById('btnCancelMap').addEventListener('click', () => document.getElementById('mapModal').classList.remove('open'));
+document.getElementById('btnConfirmMap').addEventListener('click', () => {
+  const pos = marker.getLatLng();
+  if (activeMapTarget === 'review') {
+    document.getElementById('r-lat').value = pos.lat.toFixed(6);
+    document.getElementById('r-lon').value = pos.lng.toFixed(6);
+  } else {
+    document.getElementById('lat').value = pos.lat.toFixed(6);
+    document.getElementById('lon').value = pos.lng.toFixed(6);
+  }
+  document.getElementById('mapModal').classList.remove('open');
+  showToast('📍 Location updated');
+});
+
+// ═══════════════════════════════════════════════
+// GPS TAB HELPERS
+// ═══════════════════════════════════════════════
+document.getElementById('btnRandomize').addEventListener('click', randomizeDefaults);
+
+document.getElementById('btnApplyGpsToAll').addEventListener('click', () => {
+  const d = {
+    lat  : document.getElementById('lat').value,
+    lon  : document.getElementById('lon').value,
+    acc  : document.getElementById('acc').value,
+    azi  : document.getElementById('azi').value,
+    pitch: document.getElementById('pitch').value,
+  };
+  queue.forEach(item => { Object.assign(item.extractedData, d); });
+  showToast(`📋 GPS applied to all ${queue.length} photos`);
+});
+
+// ═══════════════════════════════════════════════
+// STATUS
+// ═══════════════════════════════════════════════
+function setStatus(msg) { statusPill.textContent = msg; }
+
+// ═══════════════════════════════════════════════
+// TOAST
+// ═══════════════════════════════════════════════
+let toastTimer;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (type==='error'?' error':type==='warn'?' warn':'');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className='toast', 3000);
+}
+
+// ═══════════════════════════════════════════════
+// EXPORT
+// ═══════════════════════════════════════════════
+document.getElementById('btnDownloadSingle').addEventListener('click', () => {
+  const item = queue[currentIdx];
+  if (!item?.resultDataURL) return;
+  exportOne(item.resultDataURL, document.getElementById('customFileName').value.trim() || item.originalName);
+});
+
+async function exportOne(dataURL, filename) {
+  let data = dataURL;
+  const res = document.getElementById('exportRes').value;
+  if (res !== 'original') data = await scaleDataURL(data, parseInt(res));
+  if (!filename.toLowerCase().endsWith('.jpg')) filename += '.jpg';
+  const a = document.createElement('a');
+  a.download = filename; a.href = data; a.click();
+}
+
+function scaleDataURL(url, tw) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      if (img.width <= tw) return resolve(url);
+      const c = document.createElement('canvas');
+      c.width = tw; c.height = Math.round(img.height * tw / img.width);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      resolve(c.toDataURL('image/jpeg', 0.95));
+    };
+    img.src = url;
+  });
+}
+
+async function downloadZip() {
+  const ready = queue.filter(q => q.resultDataURL);
+  if (!ready.length) { showToast('No processed photos', 'error'); return; }
+
+  const res    = document.getElementById('exportRes').value;
+  const prefix = document.getElementById('zipPrefix').value.trim() || 'anglecam_export';
+  const zip    = new JSZip();
+
+  document.getElementById('zipProg').style.display = 'block';
+  const fill  = document.getElementById('zipProgFill');
+  const label = document.getElementById('zipProgLabel');
+
+  let count = 0;
+  for (let i = 0; i < queue.length; i++) {
+    const item = queue[i];
+    if (!item.resultDataURL) continue;
+    let data = item.resultDataURL;
+    if (res !== 'original') data = await scaleDataURL(data, parseInt(res));
+    const fname = item.originalName || `${prefix}_${i+1}.jpg`;
+    zip.file(fname, data.split(',')[1], { base64:true });
+    count++;
+    fill.style.width = (count/ready.length*100)+'%';
+    label.textContent = `Packing ${count} of ${ready.length}…`;
+  }
+
+  label.textContent = 'Generating ZIP…';
+  const blob = await zip.generateAsync({ type:'blob' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${prefix}.zip`;
+  a.click();
+
+  document.getElementById('zipProg').style.display = 'none';
+  fill.style.width = '0%';
+  showToast(`📦 ${count} photos downloaded!`);
+}
+
+document.getElementById('btnDownloadAll').addEventListener('click', downloadZip);
+document.getElementById('btnZip').addEventListener('click', downloadZip);
+</script>
+</body>
+</html>
