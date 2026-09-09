@@ -165,7 +165,7 @@ select { cursor:pointer; } select option { background:var(--dark2); }
 <!-- TOPBAR -->
 <div class="topbar">
   <span class="brand">📷 Anglecam Studio</span>
-  <span class="hint"><kbd>Enter</kbd> Confirm &amp; Next &nbsp;|&nbsp; <kbd>←</kbd><kbd>→</kbd> Navigate</span>
+  <span class="hint"><kbd>Tab</kbd> Confirm &amp; Next &nbsp;|&nbsp; <kbd>Enter</kbd> Download &nbsp;|&nbsp; <kbd>←</kbd><kbd>→</kbd> Navigate</span>
   <div class="prog-wrap" id="progWrap"><div class="prog-fill" id="progFill"></div></div>
   <span class="prog-label" id="progLabel"></span>
   <button class="topbar-btn" onclick="document.getElementById('hiddenUpload').click()">
@@ -208,7 +208,21 @@ select { cursor:pointer; } select option { background:var(--dark2); }
       <small>Multiple photos supported — auto-processes instantly</small>
     </div>
     <img id="crop-image" src="" alt="">
-    <canvas id="final-canvas"></canvas>
+    <div id="compareWrap" style="display:none; width:100%; height:100%; overflow:hidden; position:relative; cursor:grab; padding-bottom: 40px; box-sizing: border-box; touch-action: none;">
+      <div id="compareInner" style="display:flex; flex-direction:row; gap:16px; align-items:center; justify-content:center; width:100%; height:100%; transform-origin: center; transform: translate(0px, 0px) scale(1);">
+        <div style="display:flex; flex-direction:column; align-items:center; max-width:48%; max-height:100%;">
+          <span style="font-size:0.75rem; color:var(--text2); margin-bottom:8px; font-weight:700;">Original Upload</span>
+          <img id="origPreview" style="max-width:100%; max-height:calc(100% - 24px); border-radius:4px; box-shadow:0 8px 32px rgba(0,0,0,.5); object-fit:contain; pointer-events:none;">
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; max-width:48%; max-height:100%;">
+          <span style="font-size:0.75rem; color:var(--green); margin-bottom:8px; font-weight:700;">New Edited</span>
+          <canvas id="final-canvas" style="display:block; max-width:100%; max-height:calc(100% - 24px); border-radius:4px; box-shadow:0 8px 32px rgba(0,0,0,.5); pointer-events:none;"></canvas>
+        </div>
+      </div>
+      <div style="position:absolute; bottom:50px; left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.6); padding:6px 12px; border-radius:20px; font-size:0.7rem; color:#ccc; pointer-events:none;">
+        Scroll to zoom, drag to pan
+      </div>
+    </div>
     <div class="status-pill" id="statusPill">Waiting…</div>
     <div class="canvas-nav" id="canvasNav" style="display:none">
       <button class="nav-btn" id="btnPrev">← Prev</button>
@@ -255,7 +269,7 @@ select { cursor:pointer; } select option { background:var(--dark2); }
         <div class="section-label">Actions</div>
         <button class="btn btn-primary" id="btnRestamp">🔄 Re-stamp with edits</button>
         <button class="btn btn-green btn-confirm-pulse" id="btnConfirm" disabled>✓ Confirm &amp; Next →</button>
-        <p style="font-size:0.68rem;color:var(--mid);text-align:center">Set time above, then confirm. Press <kbd>Enter</kbd> to advance.</p>
+        <p style="font-size:0.68rem;color:var(--mid);text-align:center">Set time above, then confirm. Press <kbd>Tab</kbd> to advance.</p>
       </div>
 
       <!-- CROP TAB -->
@@ -521,7 +535,7 @@ async function ocrPhoto(img) {
   try {
     const tc = document.createElement('canvas');
     const sh = img.naturalHeight * 0.4;
-    const sw = img.naturalWidth  * 0.6;
+    const sw = img.naturalWidth;
     tc.width = sw; tc.height = sh;
     tc.getContext('2d').drawImage(img, 0, img.naturalHeight - sh, sw, sh, 0, 0, sw, sh);
 
@@ -549,21 +563,31 @@ function parseOCR(txt) {
 }
 
 function autoCrop(img, hasTag) {
-  const c = document.createElement('canvas');
-  c.width = img.naturalWidth;
-
-  // Always crop bottom if checkbox is checked (for re-tagging workflow)
-  // hasTag from OCR is a hint, but don't rely on it alone
   const shouldCrop = document.getElementById('autoCropTag').checked;
-  const keepRatio  = shouldCrop ? 0.85 : 1.0;
-  c.height = Math.floor(img.naturalHeight * keepRatio);
+  const maxUsableHeight = shouldCrop ? Math.floor(img.naturalHeight * 0.85) : img.naturalHeight;
+  const maxUsableWidth = img.naturalWidth;
 
-  // KEY FIX: source height = c.height (top portion only), NOT img.naturalHeight
-  // Using 9-arg drawImage: drawImage(src, sx, sy, sw, sh, dx, dy, dw, dh)
+  const targetRatio = img.naturalWidth > img.naturalHeight ? (4/3) : (3/4);
+  
+  let cropW = maxUsableWidth;
+  let cropH = Math.floor(cropW / targetRatio);
+  
+  if (cropH > maxUsableHeight) {
+    cropH = maxUsableHeight;
+    cropW = Math.floor(cropH * targetRatio);
+  }
+  
+  const cropX = Math.floor((img.naturalWidth - cropW) / 2);
+  const cropY = 0; // anchor to top to ensure we cut off the bottom tag
+  
+  const c = document.createElement('canvas');
+  c.width = cropW;
+  c.height = cropH;
+
   c.getContext('2d').drawImage(
     img,
-    0, 0, c.width, c.height,   // source: top-left crop, only c.height rows
-    0, 0, c.width, c.height    // destination: full canvas
+    cropX, cropY, cropW, cropH,
+    0, 0, cropW, cropH
   );
 
   // Upscale if needed
@@ -658,6 +682,8 @@ function openReview(index) {
   cropImage.style.display = 'none';
   if (cropper) { cropper.destroy(); cropper = null; }
 
+  document.getElementById('origPreview').src = item.objectURL;
+
   finalCanvas.width  = 1;
   finalCanvas.height = 1;
   // Draw stamped result
@@ -666,7 +692,7 @@ function openReview(index) {
     finalCanvas.width  = img.width;
     finalCanvas.height = img.height;
     ctx.drawImage(img, 0, 0);
-    finalCanvas.style.display = 'block';
+    document.getElementById('compareWrap').style.display = 'flex';
   };
   img.src = item.resultDataURL;
 
@@ -813,8 +839,18 @@ document.getElementById('btnConfirm').addEventListener('click', confirmAndNext);
 // KEYBOARD
 // ═══════════════════════════════════════════════
 document.addEventListener('keydown', e => {
+  if (e.key === 'Tab') {
+    e.preventDefault();
+    confirmAndNext();
+    return;
+  }
+  
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-  if (e.key === 'Enter') confirmAndNext();
+  
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    document.getElementById('btnDownloadSingle').click();
+  }
   if (e.key === 'ArrowLeft')  openReview(currentIdx - 1);
   if (e.key === 'ArrowRight') openReview(currentIdx + 1);
 });
@@ -881,6 +917,7 @@ document.getElementById('btnEnterCrop').addEventListener('click', () => {
   const item = queue[currentIdx];
   if (!item) return;
 
+  document.getElementById('compareWrap').style.display = 'none';
   finalCanvas.style.display = 'none';
   cropImage.style.display = 'block';
   cropImage.src = item.objectURL;
@@ -944,7 +981,8 @@ document.getElementById('btnStamp').addEventListener('click', () => {
   const img = new Image();
   img.onload = () => {
     finalCanvas.width=img.width; finalCanvas.height=img.height;
-    ctx.drawImage(img,0,0); finalCanvas.style.display='block';
+    ctx.drawImage(img,0,0); 
+    document.getElementById('compareWrap').style.display = 'flex';
   };
   img.src = item.resultDataURL;
 
@@ -1099,6 +1137,66 @@ async function downloadZip() {
 
 document.getElementById('btnDownloadAll').addEventListener('click', downloadZip);
 document.getElementById('btnZip').addEventListener('click', downloadZip);
+
+// ═══════════════════════════════════════════════
+// COMPARE PAN & ZOOM
+// ═══════════════════════════════════════════════
+let cmpScale = 1;
+let cmpPanX = 0, cmpPanY = 0;
+let cmpIsPanning = false;
+let cmpStartX = 0, cmpStartY = 0;
+
+const compareWrap = document.getElementById('compareWrap');
+const compareInner = document.getElementById('compareInner');
+
+function resetComparePanZoom() {
+  cmpScale = 1; cmpPanX = 0; cmpPanY = 0;
+  updateCompareTransform();
+}
+
+function updateCompareTransform() {
+  compareInner.style.transform = `translate(${cmpPanX}px, ${cmpPanY}px) scale(${cmpScale})`;
+}
+
+compareWrap.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const zoomSensitivity = 0.1;
+  const delta = e.deltaY > 0 ? -1 : 1;
+  cmpScale += delta * zoomSensitivity;
+  cmpScale = Math.min(Math.max(0.5, cmpScale), 5);
+  updateCompareTransform();
+});
+
+compareWrap.addEventListener('mousedown', (e) => {
+  cmpIsPanning = true;
+  cmpStartX = e.clientX - cmpPanX;
+  cmpStartY = e.clientY - cmpPanY;
+  compareWrap.style.cursor = 'grabbing';
+});
+
+compareWrap.addEventListener('mousemove', (e) => {
+  if (!cmpIsPanning) return;
+  cmpPanX = e.clientX - cmpStartX;
+  cmpPanY = e.clientY - cmpStartY;
+  updateCompareTransform();
+});
+
+compareWrap.addEventListener('mouseup', () => {
+  cmpIsPanning = false;
+  compareWrap.style.cursor = 'grab';
+});
+
+compareWrap.addEventListener('mouseleave', () => {
+  cmpIsPanning = false;
+  compareWrap.style.cursor = 'grab';
+});
+
+// Also reset pan/zoom when switching review index
+const originalOpenReview = openReview;
+openReview = function(index) {
+  resetComparePanZoom();
+  originalOpenReview(index);
+};
 </script>
 </body>
 </html>
