@@ -967,7 +967,12 @@ select option { background: var(--bg-surface2); color: var(--text); }
         <div class="section-label">⚠ Required to Confirm</div>
 
         <div class="field">
-          <label>Date &amp; Time <span class="required-badge">REQUIRED</span></label>
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label style="margin-bottom:0;">Date &amp; Time <span class="required-badge">REQUIRED</span></label>
+            <button type="button" class="btn btn-ghost" id="btnApplyTimeToAll" title="Copy this date &amp; time to all photos in the batch" style="width:auto; padding:2px 8px; font-size:0.68rem; height:22px; color:var(--accent-light); border-color:rgba(56, 189, 248, 0.3); white-space:nowrap;">
+              📋 Copy to All
+            </button>
+          </div>
           <input type="datetime-local" id="r-time" class="required-field">
           <small style="font-size:0.68rem;color:var(--red)" id="timeWarning">⚠ You must set the time before confirming</small>
         </div>
@@ -975,17 +980,38 @@ select option { background: var(--bg-surface2); color: var(--text); }
         <div class="field">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <label style="margin-bottom:0;">Note</label>
-            <button type="button" class="btn btn-ghost" id="btnApplyNoteToAll" title="Copy this note to all photos in the batch" style="width:auto; padding:2px 8px; font-size:0.68rem; height:22px; color:var(--accent-light); border-color:rgba(56, 189, 248, 0.3);">
+            <button type="button" class="btn btn-ghost" id="btnApplyNoteToAll" title="Copy this note to all photos in the batch" style="width:auto; padding:2px 8px; font-size:0.68rem; height:22px; color:var(--accent-light); border-color:rgba(56, 189, 248, 0.3); white-space:nowrap;">
               📋 Copy to All
             </button>
           </div>
           <input type="text" id="r-note" placeholder="e.g. sudip poudel">
         </div>
 
-        <div class="section-label">GPS (auto-filled — edit if wrong)</div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div class="section-label" style="margin:0;">GPS (auto-filled — edit if wrong)</div>
+          <button type="button" class="btn btn-ghost" id="btnApplyCoordsToAll" title="Copy both Lat &amp; Lon to all photos in the batch" style="width:auto; padding:2px 8px; font-size:0.68rem; height:22px; color:var(--accent-light); border-color:rgba(56, 189, 248, 0.3); white-space:nowrap;">
+            📋 Copy Lat+Lon to All
+          </button>
+        </div>
         <div class="grid-2">
-          <div class="field"><label>Lat</label><input type="text" id="r-lat"></div>
-          <div class="field"><label>Lon</label><input type="text" id="r-lon"></div>
+          <div class="field">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label style="margin-bottom:0;">Lat</label>
+              <button type="button" class="btn btn-ghost" id="btnApplyLatToAll" title="Copy latitude to all photos in the batch" style="width:auto; padding:2px 6px; font-size:0.65rem; height:20px; color:var(--accent-light); border-color:rgba(56, 189, 248, 0.3); white-space:nowrap;">
+                📋 Copy
+              </button>
+            </div>
+            <input type="text" id="r-lat">
+          </div>
+          <div class="field">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label style="margin-bottom:0;">Lon</label>
+              <button type="button" class="btn btn-ghost" id="btnApplyLonToAll" title="Copy longitude to all photos in the batch" style="width:auto; padding:2px 6px; font-size:0.65rem; height:20px; color:var(--accent-light); border-color:rgba(56, 189, 248, 0.3); white-space:nowrap;">
+                📋 Copy
+              </button>
+            </div>
+            <input type="text" id="r-lon">
+          </div>
         </div>
         <button class="btn btn-blue" id="btnMapReview">🗺 Pick on Map</button>
         <div class="grid-2">
@@ -1004,7 +1030,7 @@ select option { background: var(--bg-surface2); color: var(--text); }
       <div class="tab-pane" id="tab-crop">
         <div class="section-label">Aspect Ratio</div>
         <div class="ratio-pills">
-          <div class="ratio-pill active" data-ratio="auto">3:4 / 4:3 (Auto)</div>
+          <div class="ratio-pill active" data-ratio="auto">3:4 (Auto)</div>
           <div class="ratio-pill" data-ratio="0.75">3:4</div>
           <div class="ratio-pill" data-ratio="1.3333">4:3</div>
           <div class="ratio-pill" data-ratio="original">Original</div>
@@ -1017,7 +1043,7 @@ select option { background: var(--bg-surface2); color: var(--text); }
         <button class="btn btn-primary" id="btnEnterCrop">✂ Enter Crop Mode</button>
         <div class="check-row">
           <input type="checkbox" id="autoCropTag" checked>
-          <label for="autoCropTag">Auto-crop in 3:4 / 4:3 (removes white box)</label>
+          <label for="autoCropTag">Auto-crop in 3:4 (removes white box)</label>
         </div>
         <div class="check-row">
           <input type="checkbox" id="upscaleCrop" checked>
@@ -1033,8 +1059,24 @@ select option { background: var(--bg-surface2); color: var(--text); }
       <!-- GPS TAB -->
       <div class="tab-pane" id="tab-gps">
         <div class="grid-2">
-          <div class="field"><label>Latitude</label><input type="text" id="lat" placeholder="28.206849"></div>
-          <div class="field"><label>Longitude</label><input type="text" id="lon" placeholder="83.994412"></div>
+          <div class="field">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label style="margin-bottom:0;">Latitude</label>
+              <button type="button" class="btn btn-ghost" id="btnApplyGpsLatToAll" title="Copy latitude to all photos in batch" style="width:auto; padding:2px 6px; font-size:0.65rem; height:20px; color:var(--accent-light); border-color:rgba(56, 189, 248, 0.3); white-space:nowrap;">
+                📋 Copy
+              </button>
+            </div>
+            <input type="text" id="lat" placeholder="28.206849">
+          </div>
+          <div class="field">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <label style="margin-bottom:0;">Longitude</label>
+              <button type="button" class="btn btn-ghost" id="btnApplyGpsLonToAll" title="Copy longitude to all photos in batch" style="width:auto; padding:2px 6px; font-size:0.65rem; height:20px; color:var(--accent-light); border-color:rgba(56, 189, 248, 0.3); white-space:nowrap;">
+                📋 Copy
+              </button>
+            </div>
+            <input type="text" id="lon" placeholder="83.994412">
+          </div>
         </div>
         <button class="btn btn-blue" id="btnOpenMap">🗺 Pick on Map</button>
         <div class="grid-2">
@@ -1042,7 +1084,15 @@ select option { background: var(--bg-surface2); color: var(--text); }
           <div class="field"><label>Azimuth</label><input type="text" id="azi"></div>
         </div>
         <div class="field"><label>Pitch</label><input type="text" id="pitch"></div>
-        <div class="field"><label>Date &amp; Time</label><input type="datetime-local" id="timeInput"></div>
+        <div class="field">
+          <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label style="margin-bottom:0;">Date &amp; Time</label>
+            <button type="button" class="btn btn-ghost" id="btnApplyGpsTimeToAll" title="Copy date &amp; time to all photos in batch" style="width:auto; padding:2px 8px; font-size:0.68rem; height:22px; color:var(--accent-light); border-color:rgba(56, 189, 248, 0.3); white-space:nowrap;">
+              📋 Copy to All
+            </button>
+          </div>
+          <input type="datetime-local" id="timeInput">
+        </div>
         <div class="field">
           <div style="display:flex; justify-content:space-between; align-items:center;">
             <label style="margin-bottom:0;">Note</label>
@@ -1456,8 +1506,8 @@ function detectOldTagBoundary(img, hasTag) {
 function autoCrop(img, hasTag) {
   const shouldCrop = document.getElementById('autoCropTag').checked;
   
-  const isLandscape = img.naturalWidth > img.naturalHeight;
-  const targetRatio = isLandscape ? (4 / 3) : (3 / 4);
+  // Autocrop always uses 3:4 ratio (0.75), no other ratio
+  const targetRatio = 3 / 4;
 
   let cropW = img.naturalWidth;
   let cropH = img.naturalHeight;
@@ -1476,7 +1526,7 @@ function autoCrop(img, hasTag) {
       maxUsableHeight = Math.floor(img.naturalHeight * 0.85);
     }
 
-    // 2. Enforce exact 3:4 (portrait) or 4:3 (landscape) aspect ratio
+    // 2. Enforce exact 3:4 aspect ratio
     cropH = maxUsableHeight;
     cropW = Math.floor(cropH * targetRatio);
 
@@ -1507,18 +1557,18 @@ function autoCrop(img, hasTag) {
     0, 0, cropW, cropH
   );
 
-  // Upscale if needed while maintaining exact 3:4 or 4:3 ratio
+  // Upscale if needed while maintaining exact 3:4 ratio
   if (document.getElementById('upscaleCrop').checked) {
     const minSide = Math.min(c.width, c.height);
     if (minSide < 1280) {
       const sf = 1280 / minSide;
       const uc = document.createElement('canvas');
-      if (!isLandscape) {
+      if (shouldCrop) {
         uc.width = 1280;
-        uc.height = Math.round(1280 * (4 / 3)); // 1707 (3:4 ratio)
+        uc.height = Math.round(1280 * (4 / 3)); // 1707 (exact 3:4 ratio)
       } else {
-        uc.height = 1280;
-        uc.width = Math.round(1280 * (4 / 3)); // 1707 (4:3 ratio)
+        uc.width = Math.round(c.width * sf);
+        uc.height = Math.round(c.height * sf);
       }
       const ux = uc.getContext('2d');
       ux.imageSmoothingEnabled = true; ux.imageSmoothingQuality = 'high';
@@ -1852,11 +1902,10 @@ document.getElementById('btnEnterCrop').addEventListener('click', () => {
 
   cropImage.onload = () => {
     if (cropper) { cropper.destroy(); cropper = null; }
-    const isLandscape = cropImage.naturalWidth > cropImage.naturalHeight;
-    const defaultRatio = isLandscape ? (4 / 3) : (3 / 4);
+    const defaultRatio = 3 / 4; // Always 3:4 ratio
 
     document.querySelectorAll('.ratio-pill').forEach(p =>
-      p.classList.toggle('active', p.dataset.ratio === 'auto' || p.dataset.ratio === (isLandscape ? '1.3333' : '0.75')));
+      p.classList.toggle('active', p.dataset.ratio === 'auto' || p.dataset.ratio === '0.75'));
 
     cropper = new Cropper(cropImage, {
       aspectRatio: defaultRatio,
@@ -1891,7 +1940,7 @@ document.getElementById('btnEnterCrop').addEventListener('click', () => {
     });
     document.getElementById('btnStamp').disabled = false;
     document.querySelector('[data-tab="crop"]').click();
-    setStatus('Crop mode — 3:4 / 4:3 box adjusted, click Stamp to apply');
+    setStatus('Crop mode — 3:4 box adjusted, click Stamp to apply');
   };
 });
 
@@ -1904,8 +1953,7 @@ document.querySelectorAll('.ratio-pill').forEach(pill => {
     } else if (r === 'original') {
       cropper.setAspectRatio(cropImage.naturalWidth / cropImage.naturalHeight);
     } else if (r === 'auto') {
-      const isLand = cropImage.naturalWidth > cropImage.naturalHeight;
-      cropper.setAspectRatio(isLand ? (4 / 3) : (3 / 4));
+      cropper.setAspectRatio(3 / 4);
     } else {
       cropper.setAspectRatio(parseFloat(r));
     }
@@ -1980,7 +2028,7 @@ document.getElementById('autoCropTag')?.addEventListener('change', async (e) => 
     ctx.drawImage(resImg, 0, 0);
   };
   resImg.src = item.resultDataURL;
-  showToast(e.target.checked ? '✂ Tag auto-cropped (white box removed)' : 'Original full frame restored');
+  showToast(e.target.checked ? '✂ Tag auto-cropped in 3:4 (white box removed)' : 'Original full frame restored');
 });
 
 // ═══════════════════════════════════════════════
@@ -2019,11 +2067,28 @@ document.getElementById('btnConfirmMap').addEventListener('click', () => {
 });
 
 // ═══════════════════════════════════════════════
-// GPS TAB HELPERS
+// GPS & COPY TO ALL HELPERS
 // ═══════════════════════════════════════════════
 document.getElementById('btnRandomize').addEventListener('click', randomizeDefaults);
 
+function refreshCurrentCanvas() {
+  if (currentIdx >= 0 && queue[currentIdx] && queue[currentIdx].resultDataURL) {
+    const item = queue[currentIdx];
+    const img = new Image();
+    img.onload = () => {
+      finalCanvas.width = img.width;
+      finalCanvas.height = img.height;
+      ctx.drawImage(img, 0, 0);
+    };
+    img.src = item.resultDataURL;
+  }
+}
+
 document.getElementById('btnApplyGpsToAll').addEventListener('click', () => {
+  if (!queue || queue.length === 0) {
+    showToast('No photos in queue', 'warn');
+    return;
+  }
   const d = {
     lat  : document.getElementById('lat').value,
     lon  : document.getElementById('lon').value,
@@ -2031,8 +2096,22 @@ document.getElementById('btnApplyGpsToAll').addEventListener('click', () => {
     azi  : document.getElementById('azi').value,
     pitch: document.getElementById('pitch').value,
   };
-  queue.forEach(item => { Object.assign(item.extractedData, d); });
-  showToast(`📋 GPS applied to all ${queue.length} photos`);
+  queue.forEach(item => {
+    if (!item.extractedData) item.extractedData = {};
+    Object.assign(item.extractedData, d);
+    if (item.croppedCanvas) {
+      item.resultDataURL = stampCanvas(item.croppedCanvas, buildLines(item.extractedData));
+    }
+  });
+  if (currentIdx >= 0 && queue[currentIdx]) {
+    document.getElementById('r-lat').value   = d.lat;
+    document.getElementById('r-lon').value   = d.lon;
+    document.getElementById('r-acc').value   = d.acc;
+    document.getElementById('r-azi').value   = d.azi;
+    document.getElementById('r-pitch').value = d.pitch;
+    refreshCurrentCanvas();
+  }
+  showToast(`📋 GPS applied to all ${queue.length} photo(s)!`);
 });
 
 function copyNoteToAll(noteVal) {
@@ -2056,27 +2135,162 @@ function copyNoteToAll(noteVal) {
   const gpsNote = document.getElementById('note');
   if (gpsNote) gpsNote.value = note;
 
-  // Update current preview canvas immediately
-  if (currentIdx >= 0 && queue[currentIdx]) {
-    const item = queue[currentIdx];
-    const img = new Image();
-    img.onload = () => {
-      finalCanvas.width = img.width;
-      finalCanvas.height = img.height;
-      ctx.drawImage(img, 0, 0);
-    };
-    img.src = item.resultDataURL;
-  }
-
+  refreshCurrentCanvas();
   showToast(`📋 Note copied to all ${queue.length} photo(s)!`);
 }
 
+function copyTimeToAll(timeVal) {
+  const time = (timeVal !== undefined ? timeVal : (document.getElementById('r-time').value || document.getElementById('timeInput').value)).trim();
+  if (!time) {
+    showToast('⚠ Set date & time first!', 'warn');
+    return;
+  }
+  if (!queue || queue.length === 0) {
+    showToast('No photos in queue', 'warn');
+    return;
+  }
+
+  queue.forEach(item => {
+    if (!item.extractedData) item.extractedData = {};
+    item.extractedData.time = time;
+    item.timeConfirmed = true;
+    if (item.croppedCanvas) {
+      item.resultDataURL = stampCanvas(item.croppedCanvas, buildLines(item.extractedData));
+    }
+  });
+
+  document.getElementById('r-time').value = time;
+  const gpsTime = document.getElementById('timeInput');
+  if (gpsTime) gpsTime.value = time;
+
+  updateTimeFieldState();
+  updateConfirmButton();
+  refreshCurrentCanvas();
+
+  showToast(`📋 Date & Time copied to all ${queue.length} photo(s)!`);
+}
+
+function copyLatToAll(latVal) {
+  const lat = (latVal !== undefined ? latVal : (document.getElementById('r-lat').value || document.getElementById('lat').value)).trim();
+  if (!lat) {
+    showToast('⚠ Latitude is empty', 'warn');
+    return;
+  }
+  if (!queue || queue.length === 0) {
+    showToast('No photos in queue', 'warn');
+    return;
+  }
+
+  queue.forEach(item => {
+    if (!item.extractedData) item.extractedData = {};
+    item.extractedData.lat = lat;
+    if (item.croppedCanvas) {
+      item.resultDataURL = stampCanvas(item.croppedCanvas, buildLines(item.extractedData));
+    }
+  });
+
+  document.getElementById('r-lat').value = lat;
+  const gpsLat = document.getElementById('lat');
+  if (gpsLat) gpsLat.value = lat;
+
+  refreshCurrentCanvas();
+  showToast(`📋 Latitude copied to all ${queue.length} photo(s)!`);
+}
+
+function copyLonToAll(lonVal) {
+  const lon = (lonVal !== undefined ? lonVal : (document.getElementById('r-lon').value || document.getElementById('lon').value)).trim();
+  if (!lon) {
+    showToast('⚠ Longitude is empty', 'warn');
+    return;
+  }
+  if (!queue || queue.length === 0) {
+    showToast('No photos in queue', 'warn');
+    return;
+  }
+
+  queue.forEach(item => {
+    if (!item.extractedData) item.extractedData = {};
+    item.extractedData.lon = lon;
+    if (item.croppedCanvas) {
+      item.resultDataURL = stampCanvas(item.croppedCanvas, buildLines(item.extractedData));
+    }
+  });
+
+  document.getElementById('r-lon').value = lon;
+  const gpsLon = document.getElementById('lon');
+  if (gpsLon) gpsLon.value = lon;
+
+  refreshCurrentCanvas();
+  showToast(`📋 Longitude copied to all ${queue.length} photo(s)!`);
+}
+
+function copyCoordsToAll(latVal, lonVal) {
+  const lat = (latVal !== undefined ? latVal : (document.getElementById('r-lat').value || document.getElementById('lat').value)).trim();
+  const lon = (lonVal !== undefined ? lonVal : (document.getElementById('r-lon').value || document.getElementById('lon').value)).trim();
+  if (!lat && !lon) {
+    showToast('⚠ Coordinates are empty', 'warn');
+    return;
+  }
+  if (!queue || queue.length === 0) {
+    showToast('No photos in queue', 'warn');
+    return;
+  }
+
+  queue.forEach(item => {
+    if (!item.extractedData) item.extractedData = {};
+    if (lat) item.extractedData.lat = lat;
+    if (lon) item.extractedData.lon = lon;
+    if (item.croppedCanvas) {
+      item.resultDataURL = stampCanvas(item.croppedCanvas, buildLines(item.extractedData));
+    }
+  });
+
+  if (lat) {
+    document.getElementById('r-lat').value = lat;
+    const gpsLat = document.getElementById('lat');
+    if (gpsLat) gpsLat.value = lat;
+  }
+  if (lon) {
+    document.getElementById('r-lon').value = lon;
+    const gpsLon = document.getElementById('lon');
+    if (gpsLon) gpsLon.value = lon;
+  }
+
+  refreshCurrentCanvas();
+  showToast(`📋 Coordinates copied to all ${queue.length} photo(s)!`);
+}
+
+// Event listeners for Copy to All
 document.getElementById('btnApplyNoteToAll')?.addEventListener('click', () => {
   copyNoteToAll(document.getElementById('r-note').value);
 });
-
 document.getElementById('btnApplyGpsNoteToAll')?.addEventListener('click', () => {
   copyNoteToAll(document.getElementById('note').value);
+});
+
+document.getElementById('btnApplyTimeToAll')?.addEventListener('click', () => {
+  copyTimeToAll(document.getElementById('r-time').value);
+});
+document.getElementById('btnApplyGpsTimeToAll')?.addEventListener('click', () => {
+  copyTimeToAll(document.getElementById('timeInput').value);
+});
+
+document.getElementById('btnApplyCoordsToAll')?.addEventListener('click', () => {
+  copyCoordsToAll(document.getElementById('r-lat').value, document.getElementById('r-lon').value);
+});
+
+document.getElementById('btnApplyLatToAll')?.addEventListener('click', () => {
+  copyLatToAll(document.getElementById('r-lat').value);
+});
+document.getElementById('btnApplyGpsLatToAll')?.addEventListener('click', () => {
+  copyLatToAll(document.getElementById('lat').value);
+});
+
+document.getElementById('btnApplyLonToAll')?.addEventListener('click', () => {
+  copyLonToAll(document.getElementById('r-lon').value);
+});
+document.getElementById('btnApplyGpsLonToAll')?.addEventListener('click', () => {
+  copyLonToAll(document.getElementById('lon').value);
 });
 
 // ═══════════════════════════════════════════════
