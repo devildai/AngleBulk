@@ -540,6 +540,7 @@ select.topbar-select:focus {
 }
 
 input[type=text],
+input[type=number],
 input[type=datetime-local],
 select {
   background: var(--input-bg);
@@ -1013,6 +1014,17 @@ select option { background: var(--bg-surface2); color: var(--text); }
             <input type="text" id="r-lon">
           </div>
         </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+          <span style="font-size:0.68rem; color:var(--text2); font-weight:600;">Radius Dispersion</span>
+          <div style="display:flex; align-items:center; gap:4px; font-size:0.68rem; color:var(--text-muted);">
+            <span>Range:</span>
+            <input type="number" id="radiusMinReview" value="1" min="0" max="100" style="width:36px; padding:2px 4px; font-size:0.68rem; height:20px; text-align:center;">m –
+            <input type="number" id="radiusMaxReview" value="10" min="1" max="500" style="width:38px; padding:2px 4px; font-size:0.68rem; height:20px; text-align:center;">m
+          </div>
+        </div>
+        <button type="button" class="btn btn-blue" id="btnRadiusReview" title="Keep this photo at exact coordinates and disperse other photos within radius" style="margin-top:2px;">
+          🎯 Disperse 1m–10m to Other Photos
+        </button>
         <button class="btn btn-blue" id="btnMapReview">🗺 Pick on Map</button>
         <div class="grid-2">
           <div class="field"><label>Accuracy</label><input type="text" id="r-acc"></div>
@@ -1078,6 +1090,17 @@ select option { background: var(--bg-surface2); color: var(--text); }
             <input type="text" id="lon" placeholder="83.994412">
           </div>
         </div>
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+          <span style="font-size:0.68rem; color:var(--text2); font-weight:600;">Radius Dispersion</span>
+          <div style="display:flex; align-items:center; gap:4px; font-size:0.68rem; color:var(--text-muted);">
+            <span>Range:</span>
+            <input type="number" id="radiusMinGps" value="1" min="0" max="100" style="width:36px; padding:2px 4px; font-size:0.68rem; height:20px; text-align:center;">m –
+            <input type="number" id="radiusMaxGps" value="10" min="1" max="500" style="width:38px; padding:2px 4px; font-size:0.68rem; height:20px; text-align:center;">m
+          </div>
+        </div>
+        <button type="button" class="btn btn-blue" id="btnRadiusGps" title="Keep this photo at exact coordinates and disperse other photos within radius" style="margin-top:2px;">
+          🎯 Disperse 1m–10m to Other Photos
+        </button>
         <button class="btn btn-blue" id="btnOpenMap">🗺 Pick on Map</button>
         <div class="grid-2">
           <div class="field"><label>Accuracy</label><input type="text" id="acc"></div>
@@ -2259,6 +2282,117 @@ function copyCoordsToAll(latVal, lonVal) {
   refreshCurrentCanvas();
   showToast(`📋 Coordinates copied to all ${queue.length} photo(s)!`);
 }
+
+function disperseCoordsToOthers(latInput, lonInput, minMeters = 1, maxMeters = 10) {
+  const latStr = (latInput !== undefined ? latInput : (document.getElementById('r-lat').value || document.getElementById('lat').value)).trim();
+  const lonStr = (lonInput !== undefined ? lonInput : (document.getElementById('r-lon').value || document.getElementById('lon').value)).trim();
+
+  const baseLat = parseFloat(latStr);
+  const baseLon = parseFloat(lonStr);
+
+  if (isNaN(baseLat) || isNaN(baseLon)) {
+    showToast('⚠ Enter valid Latitude & Longitude first!', 'warn');
+    return;
+  }
+  if (!queue || queue.length === 0) {
+    showToast('No photos in queue', 'warn');
+    return;
+  }
+
+  const rMin = Math.max(0, parseFloat(minMeters) || 1);
+  const rMax = Math.max(rMin, parseFloat(maxMeters) || 10);
+  const earthRadius = 6378137.0; // WGS84 earth equatorial radius in meters
+  const latRad = (baseLat * Math.PI) / 180.0;
+  const cosLat = Math.cos(latRad);
+
+  const anchorIdx = (currentIdx >= 0 && currentIdx < queue.length) ? currentIdx : 0;
+
+  queue.forEach((item, i) => {
+    if (!item.extractedData) item.extractedData = {};
+    if (i === anchorIdx) {
+      // The anchor photo gets the exact entered coordinate
+      item.extractedData.lat = baseLat.toFixed(6);
+      item.extractedData.lon = baseLon.toFixed(6);
+    } else {
+      // Generate uniform random point in circular annulus between rMin and rMax
+      const dist = Math.sqrt(rMin * rMin + Math.random() * (rMax * rMax - rMin * rMin));
+      const angle = Math.random() * 2 * Math.PI;
+
+      const dy = dist * Math.cos(angle); // North/South meters
+      const dx = dist * Math.sin(angle); // East/West meters
+
+      const dLat = (dy / earthRadius) * (180.0 / Math.PI);
+      const dLon = cosLat !== 0 ? (dx / (earthRadius * cosLat)) * (180.0 / Math.PI) : 0;
+
+      const newLat = baseLat + dLat;
+      const newLon = baseLon + dLon;
+
+      item.extractedData.lat = newLat.toFixed(6);
+      item.extractedData.lon = newLon.toFixed(6);
+    }
+
+    if (item.croppedCanvas) {
+      item.resultDataURL = stampCanvas(item.croppedCanvas, buildLines(item.extractedData));
+    }
+  });
+
+  // Keep anchor coordinate visible on active inputs
+  document.getElementById('r-lat').value = baseLat.toFixed(6);
+  document.getElementById('r-lon').value = baseLon.toFixed(6);
+  const gpsLat = document.getElementById('lat');
+  const gpsLon = document.getElementById('lon');
+  if (gpsLat) gpsLat.value = baseLat.toFixed(6);
+  if (gpsLon) gpsLon.value = baseLon.toFixed(6);
+
+  refreshCurrentCanvas();
+
+  const othersCount = queue.length - 1;
+  if (othersCount > 0) {
+    showToast(`🎯 Current photo at anchor; ${othersCount} other photo(s) dispersed within ${rMin}m–${rMax}m!`);
+  } else {
+    showToast(`🎯 Anchor coordinates applied to photo!`);
+  }
+}
+
+function updateRadiusButtons() {
+  const minVal = document.getElementById('radiusMinReview')?.value || '1';
+  const maxVal = document.getElementById('radiusMaxReview')?.value || '10';
+  const label = `🎯 Disperse ${minVal}m–${maxVal}m to Other Photos`;
+  const rRev = document.getElementById('btnRadiusReview');
+  const rGps = document.getElementById('btnRadiusGps');
+  if (rRev) rRev.textContent = label;
+  if (rGps) rGps.textContent = label;
+}
+
+['radiusMinReview', 'radiusMaxReview'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', (e) => {
+    const otherId = id === 'radiusMinReview' ? 'radiusMinGps' : 'radiusMaxGps';
+    const otherEl = document.getElementById(otherId);
+    if (otherEl) otherEl.value = e.target.value;
+    updateRadiusButtons();
+  });
+});
+
+['radiusMinGps', 'radiusMaxGps'].forEach(id => {
+  document.getElementById(id)?.addEventListener('input', (e) => {
+    const otherId = id === 'radiusMinGps' ? 'radiusMinReview' : 'radiusMaxReview';
+    const otherEl = document.getElementById(otherId);
+    if (otherEl) otherEl.value = e.target.value;
+    updateRadiusButtons();
+  });
+});
+
+document.getElementById('btnRadiusReview')?.addEventListener('click', () => {
+  const min = parseFloat(document.getElementById('radiusMinReview')?.value) || 1;
+  const max = parseFloat(document.getElementById('radiusMaxReview')?.value) || 10;
+  disperseCoordsToOthers(document.getElementById('r-lat').value, document.getElementById('r-lon').value, min, max);
+});
+
+document.getElementById('btnRadiusGps')?.addEventListener('click', () => {
+  const min = parseFloat(document.getElementById('radiusMinGps')?.value) || 1;
+  const max = parseFloat(document.getElementById('radiusMaxGps')?.value) || 10;
+  disperseCoordsToOthers(document.getElementById('lat').value, document.getElementById('lon').value, min, max);
+});
 
 // Event listeners for Copy to All
 document.getElementById('btnApplyNoteToAll')?.addEventListener('click', () => {
